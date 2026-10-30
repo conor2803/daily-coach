@@ -18,6 +18,14 @@ class PlanTextTest {
     }
 
     @Test
+    fun `a one-paragraph plan is split into sentences`() {
+        assertEquals(
+            listOf("No structured workout today.", "Dinner around 20:00, screens off by 21:45.", "Listen to your body."),
+            planLines("No structured workout today. Dinner around 20:00, screens off by 21:45. Listen to your body."),
+        )
+    }
+
+    @Test
     fun `splits a plan into clean lines`() {
         assertEquals(
             listOf("Run 18:00", "Dinner 19:15", "Bed 22:30"),

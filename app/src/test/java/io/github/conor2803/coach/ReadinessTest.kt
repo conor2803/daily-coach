@@ -40,8 +40,16 @@ class ReadinessTest {
     }
 
     @Test
-    fun last_nights_sleep_is_the_night_dated_today() {
-        assertNull(ReadinessCalculator.from(history(listOf(night(1, 480))), today))
+    fun a_night_older_than_yesterday_is_not_last_nights_sleep() {
+        assertNull(ReadinessCalculator.from(history(listOf(night(2, 480))), today))
+    }
+
+    @Test
+    fun before_this_mornings_sleep_has_synced_last_nights_counts_and_stays_out_of_its_own_baseline() {
+        val nights = listOf(night(1, 480)) + (2L..5L).map { night(it, 420) }
+        val sleep = ReadinessCalculator.from(history(nights), today)!!.sleep!!
+        assertEquals(480.0, sleep.value, 0.0)
+        assertEquals(420.0, sleep.baseline!!, 0.0)
     }
 
     @Test

@@ -46,9 +46,14 @@ object ReadinessCalculator {
     }
 
     private fun sleep(history: HealthHistory, today: LocalDate): Factor? {
-        val last = history.nights.firstOrNull { it.date == today } ?: return null
+        val last = history.nights.firstOrNull { it.date == today }
+            ?: history.nights.firstOrNull { it.date == today.minusDays(1) }
+            ?: return null
         val minutes = last.asleepMinutes.toDouble()
-        val baseline = baseline(history.nights.map { DayValue(it.date, it.asleepMinutes.toDouble()) }, today)
+        val baseline = baseline(
+            history.nights.filter { it.date != last.date }.map { DayValue(it.date, it.asleepMinutes.toDouble()) },
+            today,
+        )
         val base = ((minutes - EMPTY_SLEEP_MINUTES) / (FULL_SLEEP_MINUTES - EMPTY_SLEEP_MINUTES) * 100)
             .coerceIn(0.0, 100.0)
         val nudge = baseline

@@ -122,10 +122,11 @@ private fun SleepCard(history: HealthHistory, dates: List<LocalDate>) {
             legend = listOf(
                 "Deep" to MaterialTheme.colorScheme.primary,
                 "REM" to MaterialTheme.colorScheme.tertiary,
-                "Light" to MaterialTheme.colorScheme.secondaryContainer,
+                "Light" to MaterialTheme.colorScheme.primary.copy(alpha = 0.35f),
             ),
             name = "Sleep",
-            unit = " h",
+            unit = "h",
+            valueFormatter = { "%.0f".format(it) },
             modifier = Modifier.fillMaxWidth().height(chartHeight),
         )
     }
