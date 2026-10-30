@@ -10,8 +10,9 @@ asks Claude what you should do next, and sends you a notification like:
 > Screens off 21:45, bed 22:30
 > Office day and 7:40 start, so keep it easy rather than skipping it.
 
-Everything runs on your phone. No server, no account. The only thing that leaves the phone
-is the text summary sent to the Claude API (tap **Preview data** in the app to see exactly what that is).
+Everything runs on your phone. No server, no account. Two things leave the phone: the text
+summary sent to the Claude API (tap **Preview data** in the app to see exactly what that is),
+and your current location, sent to Open-Meteo to get the weather forecast.
 
 ## How it works
 
