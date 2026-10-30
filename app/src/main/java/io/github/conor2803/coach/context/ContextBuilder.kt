@@ -2,6 +2,8 @@ package io.github.conor2803.coach.context
 
 import android.content.Context
 import io.github.conor2803.coach.Prefs
+import io.github.conor2803.coach.coach.ReadinessCalculator
+import io.github.conor2803.coach.health.HealthHistoryReader
 import io.github.conor2803.coach.health.HealthReader
 import io.github.conor2803.coach.places.GeofenceManager
 import io.github.conor2803.coach.places.PlacesLog
@@ -45,6 +47,10 @@ object ContextBuilder {
             appendLine(health.trimEnd())
             appendLine()
 
+            appendLine("READINESS (worked out on the phone against my last 7 days):")
+            appendLine(readiness(context, now))
+            appendLine()
+
             appendLine("WHERE I'VE BEEN TODAY:")
             appendLine(places(context, prefs, midnight.toInstant().toEpochMilli(), zone))
             appendLine()
@@ -67,6 +73,19 @@ object ContextBuilder {
                 appendLine("YOUR LAST CHECK-IN (${ago}h ago): ${it.headline}")
             }
         }.trim()
+    }
+
+    private suspend fun readiness(context: Context, now: ZonedDateTime): String {
+        if (!HealthReader.isAvailable(context)) return "not available"
+        val readiness = runCatching {
+            ReadinessCalculator.from(HealthHistoryReader(context).read(days = 14, now = now), now.toLocalDate())
+        }.getOrNull() ?: return "not enough data yet"
+        return buildString {
+            append("${readiness.score}/100, ${readiness.label}.")
+            readiness.sleep?.let { append(" Sleep: ${it.summary}.") }
+            readiness.hrv?.let { append(" HRV: ${it.summary}.") }
+            readiness.restingHr?.let { append(" Resting HR: ${it.summary}.") }
+        }
     }
 
     private fun places(context: Context, prefs: Prefs, from: Long, zone: ZoneId): String {

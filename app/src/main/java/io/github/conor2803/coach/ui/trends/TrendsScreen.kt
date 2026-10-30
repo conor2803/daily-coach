@@ -16,6 +16,7 @@ import androidx.compose.material3.SegmentedButtonDefaults
 import androidx.compose.material3.SingleChoiceSegmentedButtonRow
 import androidx.compose.material3.Surface
 import androidx.compose.material3.Text
+import androidx.compose.material3.pulltorefresh.PullToRefreshBox
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableIntStateOf
@@ -50,11 +51,16 @@ fun TrendsScreen(contentPadding: PaddingValues, viewModel: CoachViewModel) {
     val dates = remember(days) { lastDates(days) }
     val history = health.history
 
+    PullToRefreshBox(
+        isRefreshing = health.loading,
+        onRefresh = viewModel::refresh,
+        modifier = Modifier.padding(top = contentPadding.calculateTopPadding()),
+    ) {
     LazyColumn(
         contentPadding = PaddingValues(
             start = Spacing.md,
             end = Spacing.md,
-            top = contentPadding.calculateTopPadding() + Spacing.md,
+            top = Spacing.md,
             bottom = contentPadding.calculateBottomPadding() + Spacing.xl,
         ),
         verticalArrangement = Arrangement.spacedBy(Spacing.md),
@@ -90,6 +96,7 @@ fun TrendsScreen(contentPadding: PaddingValues, viewModel: CoachViewModel) {
         item { RestingHrCard(history, dates) }
         item { StepsCard(history, dates) }
         item { TrainingCard(history, dates) }
+    }
     }
 }
 

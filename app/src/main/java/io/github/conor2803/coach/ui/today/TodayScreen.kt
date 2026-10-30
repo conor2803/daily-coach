@@ -1,5 +1,6 @@
 package io.github.conor2803.coach.ui.today
 
+import android.content.Intent
 import androidx.compose.animation.AnimatedContent
 import androidx.compose.animation.AnimatedVisibility
 import androidx.compose.foundation.layout.Arrangement
@@ -15,14 +16,17 @@ import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.lazy.items
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.rounded.Refresh
+import androidx.compose.material.icons.rounded.Share
 import androidx.compose.material.icons.rounded.Warning
 import androidx.compose.material3.Button
 import androidx.compose.material3.CircularProgressIndicator
 import androidx.compose.material3.Icon
+import androidx.compose.material3.IconButton
 import androidx.compose.material3.ListItem
 import androidx.compose.material3.ListItemDefaults
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.Surface
+import androidx.compose.material3.pulltorefresh.PullToRefreshBox
 import androidx.compose.material3.Text
 import androidx.compose.material3.TextButton
 import androidx.compose.runtime.Composable
@@ -89,11 +93,16 @@ fun TodayScreen(tick: Int, contentPadding: PaddingValues, viewModel: CoachViewMo
         setupNeeded = prefs.engine.missingSetup(prefs.apiKey, OnDeviceModel.isReady(context))
     }
 
+    PullToRefreshBox(
+        isRefreshing = health.loading,
+        onRefresh = viewModel::refresh,
+        modifier = Modifier.padding(top = contentPadding.calculateTopPadding()),
+    ) {
     LazyColumn(
         contentPadding = PaddingValues(
             start = Spacing.md,
             end = Spacing.md,
-            top = contentPadding.calculateTopPadding() + Spacing.md,
+            top = Spacing.md,
             bottom = contentPadding.calculateBottomPadding() + Spacing.xl,
         ),
         verticalArrangement = Arrangement.spacedBy(Spacing.md),
@@ -130,9 +139,20 @@ fun TodayScreen(tick: Int, contentPadding: PaddingValues, viewModel: CoachViewMo
         item { ReadinessCard(health.loading, health.available, health.readiness) }
 
         item {
-            PlanCard(advice, prefs.engine, running, nextRun = Scheduler.nextRun(context).toLocalTime()) {
-                Scheduler.runNow(context)
-            }
+            PlanCard(
+                advice = advice,
+                engine = prefs.engine,
+                running = running,
+                nextRun = Scheduler.nextRun(context).toLocalTime(),
+                onCheckIn = { Scheduler.runNow(context) },
+                onShare = { a ->
+                    val send = Intent(Intent.ACTION_SEND)
+                        .setType("text/plain")
+                        .putExtra(Intent.EXTRA_SUBJECT, a.headline)
+                        .putExtra(Intent.EXTRA_TEXT, "${a.headline}\n\n${a.plan}")
+                    context.startActivity(Intent.createChooser(send, "Share today's plan"))
+                },
+            )
         }
 
         if (lastError.isNotBlank()) {
@@ -170,6 +190,7 @@ fun TodayScreen(tick: Int, contentPadding: PaddingValues, viewModel: CoachViewMo
                 )
             }
         }
+    }
     }
 }
 
@@ -233,18 +254,33 @@ private fun FactorRow(icon: Int, name: String, factor: Factor?) {
 }
 
 @Composable
-private fun PlanCard(advice: Advice?, engine: Engine, running: Boolean, nextRun: LocalTime, onCheckIn: () -> Unit) {
+private fun PlanCard(
+    advice: Advice?,
+    engine: Engine,
+    running: Boolean,
+    nextRun: LocalTime,
+    onCheckIn: () -> Unit,
+    onShare: (Advice) -> Unit,
+) {
     Surface(
         shape = MaterialTheme.shapes.extraLarge,
         color = MaterialTheme.colorScheme.primaryContainer,
         modifier = Modifier.fillMaxWidth(),
     ) {
         Column(Modifier.padding(Spacing.lg), verticalArrangement = Arrangement.spacedBy(Spacing.sm)) {
-            Text(
-                "Today's plan",
-                style = MaterialTheme.typography.titleSmall,
-                color = MaterialTheme.colorScheme.onPrimaryContainer.copy(alpha = 0.8f),
-            )
+            Row(verticalAlignment = Alignment.CenterVertically) {
+                Text(
+                    "Today's plan",
+                    style = MaterialTheme.typography.titleSmall,
+                    color = MaterialTheme.colorScheme.onPrimaryContainer.copy(alpha = 0.8f),
+                    modifier = Modifier.weight(1f),
+                )
+                if (advice != null) {
+                    IconButton(onClick = { onShare(advice) }) {
+                        Icon(Icons.Rounded.Share, contentDescription = "Share today's plan", tint = MaterialTheme.colorScheme.onPrimaryContainer)
+                    }
+                }
+            }
             AnimatedContent(advice, label = "advice") { a ->
                 if (a == null) {
                     Text(
