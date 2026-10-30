@@ -1,6 +1,8 @@
 package io.github.conor2803.coach.coach
 
 import android.content.Context
+import android.os.SystemClock
+import android.util.Log
 import androidx.work.CoroutineWorker
 import androidx.work.WorkerParameters
 import io.github.conor2803.coach.Prefs
@@ -28,6 +30,8 @@ class CoachWorker(context: Context, params: WorkerParameters) : CoroutineWorker(
                 return done(scheduled)
             }
             val briefing = ContextBuilder.build(ctx)
+            Log.i(TAG, "check-in via ${engine.name}")
+            val startedAt = SystemClock.elapsedRealtime()
             val advice = when (engine) {
                 Engine.CLAUDE -> withContext(Dispatchers.IO) {
                     ClaudeClient.coach(prefs.apiKey, prefs.model, briefing)
@@ -36,7 +40,9 @@ class CoachWorker(context: Context, params: WorkerParameters) : CoroutineWorker(
                     OnDeviceClient.coach(OnDeviceModel.file(ctx), ctx.cacheDir, briefing)
                 }
             }
+            Log.i(TAG, "check-in via ${engine.name} finished in ${SystemClock.elapsedRealtime() - startedAt} ms")
             prefs.lastAdvice = advice
+            AdviceLog.append(ctx, advice, engine)
             prefs.lastError = ""
             Notifier.advice(ctx, advice)
             return done(scheduled)
@@ -63,5 +69,6 @@ class CoachWorker(context: Context, params: WorkerParameters) : CoroutineWorker(
     companion object {
         const val KEY_SCHEDULED = "scheduled"
         private const val MAX_RETRIES = 2
+        private const val TAG = "Coach"
     }
 }

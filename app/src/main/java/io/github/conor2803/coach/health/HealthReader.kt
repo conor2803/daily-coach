@@ -227,7 +227,7 @@ class HealthReader(private val context: Context) {
             BACKGROUND_READ,
         )
 
-        private val AWAKE_STAGES = setOf(
+        internal val AWAKE_STAGES = setOf(
             SleepSessionRecord.STAGE_TYPE_AWAKE,
             SleepSessionRecord.STAGE_TYPE_AWAKE_IN_BED,
             SleepSessionRecord.STAGE_TYPE_OUT_OF_BED,
