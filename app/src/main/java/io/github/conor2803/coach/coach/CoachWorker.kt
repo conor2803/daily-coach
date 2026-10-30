@@ -10,7 +10,7 @@ import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.withContext
 
 /**
- * One check-in: gather the day's data, ask Claude, notify.
+ * One check-in: gather the day's data, ask the chosen engine, notify.
  * Scheduled runs queue the next check-in when they finish, success or not.
  */
 class CoachWorker(context: Context, params: WorkerParameters) : CoroutineWorker(context, params) {
@@ -21,13 +21,19 @@ class CoachWorker(context: Context, params: WorkerParameters) : CoroutineWorker(
         val scheduled = inputData.getBoolean(KEY_SCHEDULED, false)
 
         try {
-            if (prefs.apiKey.isBlank()) {
-                fail(prefs, "Add your Anthropic API key in the Coach app.")
+            val engine = prefs.engine
+            engine.missingSetup(prefs.apiKey, OnDeviceModel.isDownloaded(ctx))?.let {
+                fail(prefs, it)
                 return done(scheduled)
             }
             val briefing = ContextBuilder.build(ctx)
-            val advice = withContext(Dispatchers.IO) {
-                ClaudeClient.coach(prefs.apiKey, prefs.model, briefing)
+            val advice = when (engine) {
+                Engine.CLAUDE -> withContext(Dispatchers.IO) {
+                    ClaudeClient.coach(prefs.apiKey, prefs.model, briefing)
+                }
+                Engine.ON_DEVICE -> withContext(Dispatchers.Default) {
+                    OnDeviceClient.coach(OnDeviceModel.file(ctx), ctx.cacheDir, briefing)
+                }
             }
             prefs.lastAdvice = advice
             prefs.lastError = ""

@@ -21,13 +21,16 @@ import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.navigationBarsPadding
 import androidx.compose.foundation.layout.statusBarsPadding
 import androidx.compose.foundation.rememberScrollState
+import androidx.compose.foundation.selection.selectable
 import androidx.compose.foundation.text.selection.SelectionContainer
 import androidx.compose.foundation.verticalScroll
 import androidx.compose.material3.Button
 import androidx.compose.material3.Card
+import androidx.compose.material3.LinearProgressIndicator
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.OutlinedButton
 import androidx.compose.material3.OutlinedTextField
+import androidx.compose.material3.RadioButton
 import androidx.compose.material3.Surface
 import androidx.compose.material3.Text
 import androidx.compose.material3.TextButton
@@ -45,6 +48,7 @@ import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.platform.LocalContext
+import androidx.compose.ui.semantics.Role
 import androidx.compose.ui.text.font.FontFamily
 import androidx.compose.ui.text.input.PasswordVisualTransformation
 import androidx.compose.ui.unit.dp
@@ -53,11 +57,15 @@ import androidx.core.content.ContextCompat
 import androidx.health.connect.client.PermissionController
 import androidx.work.WorkInfo
 import androidx.work.WorkManager
+import io.github.conor2803.coach.coach.Engine
+import io.github.conor2803.coach.coach.ModelState
+import io.github.conor2803.coach.coach.OnDeviceModel
 import io.github.conor2803.coach.coach.Scheduler
 import io.github.conor2803.coach.context.CalendarReader
 import io.github.conor2803.coach.context.ContextBuilder
 import io.github.conor2803.coach.health.HealthReader
 import io.github.conor2803.coach.places.GeofenceManager
+import kotlinx.coroutines.delay
 import kotlinx.coroutines.launch
 import java.time.Instant
 import java.time.ZoneId
@@ -96,6 +104,8 @@ private fun CoachScreen(tick: Int) {
     var lastError by remember { mutableStateOf(prefs.lastError) }
     var apiKey by remember { mutableStateOf(prefs.apiKey) }
     var model by remember { mutableStateOf(prefs.model) }
+    var engine by remember { mutableStateOf(prefs.engine) }
+    var modelState by remember { mutableStateOf(OnDeviceModel.state(context)) }
     var goals by remember { mutableStateOf(prefs.goals) }
     var times by remember { mutableStateOf(prefs.checkInTimes) }
     var places by remember { mutableStateOf(prefs.places) }
@@ -113,6 +123,15 @@ private fun CoachScreen(tick: Int) {
         lastError = prefs.lastError
         hcMissing = if (hcAvailable) runCatching { HealthReader(context).missingPermissions() }.getOrNull() else null
         GeofenceManager.register(context)
+    }
+
+    // Follow the model download while it runs.
+    LaunchedEffect(tick, modelState is ModelState.Downloading) {
+        modelState = OnDeviceModel.state(context)
+        while (modelState is ModelState.Downloading) {
+            delay(1_000)
+            modelState = OnDeviceModel.state(context)
+        }
     }
 
     // Reload the advice when a "check in now" run finishes.
@@ -185,7 +204,7 @@ private fun CoachScreen(tick: Int) {
         }
 
         preview?.let { text ->
-            Section("What gets sent to Claude") {
+            Section(if (engine == Engine.CLAUDE) "What gets sent to Claude" else "What the on-device model reads") {
                 SelectionContainer {
                     Text(text, fontFamily = FontFamily.Monospace, fontSize = 12.sp)
                 }
@@ -289,14 +308,36 @@ private fun CoachScreen(tick: Int) {
 
         // ---- Settings ----
         Section("Coach settings") {
-            OutlinedTextField(
-                value = apiKey,
-                onValueChange = { apiKey = it },
-                label = { Text("Anthropic API key") },
-                singleLine = true,
-                visualTransformation = PasswordVisualTransformation(),
-                modifier = Modifier.fillMaxWidth(),
-            )
+            Text("Engine", style = MaterialTheme.typography.labelLarge)
+            EngineOption("On-device (free, your data stays on the phone)", engine == Engine.ON_DEVICE) {
+                engine = Engine.ON_DEVICE
+            }
+            EngineOption("Claude (paid per check-in)", engine == Engine.CLAUDE) { engine = Engine.CLAUDE }
+
+            when (engine) {
+                Engine.ON_DEVICE -> ModelDownload(modelState) {
+                    OnDeviceModel.download(context)
+                    modelState = OnDeviceModel.state(context)
+                }
+                Engine.CLAUDE -> {
+                    OutlinedTextField(
+                        value = apiKey,
+                        onValueChange = { apiKey = it },
+                        label = { Text("Anthropic API key") },
+                        singleLine = true,
+                        visualTransformation = PasswordVisualTransformation(),
+                        modifier = Modifier.fillMaxWidth(),
+                    )
+                    OutlinedTextField(
+                        value = model,
+                        onValueChange = { model = it },
+                        label = { Text("Claude model") },
+                        singleLine = true,
+                        modifier = Modifier.fillMaxWidth(),
+                    )
+                }
+            }
+
             OutlinedTextField(
                 value = goals,
                 onValueChange = { goals = it },
@@ -311,14 +352,8 @@ private fun CoachScreen(tick: Int) {
                 singleLine = true,
                 modifier = Modifier.fillMaxWidth(),
             )
-            OutlinedTextField(
-                value = model,
-                onValueChange = { model = it },
-                label = { Text("Claude model") },
-                singleLine = true,
-                modifier = Modifier.fillMaxWidth(),
-            )
             Button(onClick = {
+                prefs.engine = engine
                 prefs.apiKey = apiKey
                 prefs.goals = goals
                 prefs.checkInTimes = times
@@ -339,6 +374,36 @@ private fun Section(title: String, content: @Composable ColumnScope.() -> Unit) 
         Column(Modifier.padding(16.dp), verticalArrangement = Arrangement.spacedBy(8.dp)) {
             Text(title, style = MaterialTheme.typography.titleSmall, color = MaterialTheme.colorScheme.primary)
             content()
+        }
+    }
+}
+
+@Composable
+private fun EngineOption(label: String, selected: Boolean, onSelect: () -> Unit) {
+    Row(
+        Modifier
+            .fillMaxWidth()
+            .selectable(selected = selected, onClick = onSelect, role = Role.RadioButton),
+        verticalAlignment = Alignment.CenterVertically,
+    ) {
+        RadioButton(selected = selected, onClick = null)
+        Text(label, Modifier.padding(start = 8.dp))
+    }
+}
+
+@Composable
+private fun ModelDownload(state: ModelState, onDownload: () -> Unit) {
+    when (state) {
+        ModelState.Ready -> Text("✓ ${OnDeviceModel.NAME} downloaded")
+        is ModelState.Downloading -> {
+            Text("Downloading ${OnDeviceModel.NAME}… " + (state.percent?.let { "$it%" } ?: "starting"))
+            LinearProgressIndicator(progress = { (state.percent ?: 0) / 100f }, modifier = Modifier.fillMaxWidth())
+        }
+        ModelState.Missing, is ModelState.Failed -> {
+            if (state is ModelState.Failed) {
+                Text("Download failed (code ${state.reason}). Try again.", color = MaterialTheme.colorScheme.error)
+            }
+            Button(onClick = onDownload) { Text("Download model (${OnDeviceModel.SIZE}, Wi-Fi)") }
         }
     }
 }

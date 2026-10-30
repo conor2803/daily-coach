@@ -1,6 +1,8 @@
 package io.github.conor2803.coach
 
 import android.content.Context
+import io.github.conor2803.coach.coach.Engine
+import io.github.conor2803.coach.coach.OnDeviceModel
 import org.json.JSONArray
 import org.json.JSONObject
 
@@ -20,9 +22,18 @@ class Prefs(context: Context) {
         get() = sp.getString("api_key", "") ?: ""
         set(v) = sp.edit().putString("api_key", v.trim()).apply()
 
+    var engine: Engine
+        get() = Engine.fromStored(sp.getString("engine", null))
+        set(v) = sp.edit().putString("engine", v.name).apply()
+
+    /** The Claude model; the on-device engine always runs [OnDeviceModel]. */
     var model: String
         get() = sp.getString("model", DEFAULT_MODEL) ?: DEFAULT_MODEL
         set(v) = sp.edit().putString("model", v.trim().ifBlank { DEFAULT_MODEL }).apply()
+
+    var modelDownloadId: Long
+        get() = sp.getLong("model_download_id", OnDeviceModel.NO_DOWNLOAD)
+        set(v) = sp.edit().putLong("model_download_id", v).apply()
 
     /** Free text the coach reads every time: goals, bedtime, injuries, preferences. */
     var goals: String
