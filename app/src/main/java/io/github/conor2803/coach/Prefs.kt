@@ -35,6 +35,10 @@ class Prefs(context: Context) {
         get() = sp.getLong("model_download_id", OnDeviceModel.NO_DOWNLOAD)
         set(v) = sp.edit().putLong("model_download_id", v).apply()
 
+    var modelVerified: String
+        get() = sp.getString("model_verified", "") ?: ""
+        set(v) = sp.edit().putString("model_verified", v).apply()
+
     /** Free text the coach reads every time: goals, bedtime, injuries, preferences. */
     var goals: String
         get() = sp.getString("goals", DEFAULT_GOALS) ?: DEFAULT_GOALS

@@ -22,7 +22,8 @@ class CoachWorker(context: Context, params: WorkerParameters) : CoroutineWorker(
 
         try {
             val engine = prefs.engine
-            engine.missingSetup(prefs.apiKey, OnDeviceModel.isDownloaded(ctx))?.let {
+            val modelReady = engine == Engine.ON_DEVICE && OnDeviceModel.isReady(ctx)
+            engine.missingSetup(prefs.apiKey, modelReady)?.let {
                 fail(prefs, it)
                 return done(scheduled)
             }

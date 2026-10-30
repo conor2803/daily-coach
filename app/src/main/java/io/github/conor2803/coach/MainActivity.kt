@@ -125,13 +125,14 @@ private fun CoachScreen(tick: Int) {
         GeofenceManager.register(context)
     }
 
-    // Follow the model download while it runs.
+    // Follow the model download while it runs, then check the file.
     LaunchedEffect(tick, modelState is ModelState.Downloading) {
         modelState = OnDeviceModel.state(context)
         while (modelState is ModelState.Downloading) {
             delay(1_000)
             modelState = OnDeviceModel.state(context)
         }
+        if (modelState == ModelState.Verifying) modelState = OnDeviceModel.verify(context)
     }
 
     // Reload the advice when a "check in now" run finishes.
@@ -399,10 +400,12 @@ private fun ModelDownload(state: ModelState, onDownload: () -> Unit) {
             Text("Downloading ${OnDeviceModel.NAME}… " + (state.percent?.let { "$it%" } ?: "starting"))
             LinearProgressIndicator(progress = { (state.percent ?: 0) / 100f }, modifier = Modifier.fillMaxWidth())
         }
+        ModelState.Verifying -> {
+            Text("Checking the downloaded model…")
+            LinearProgressIndicator(modifier = Modifier.fillMaxWidth())
+        }
         ModelState.Missing, is ModelState.Failed -> {
-            if (state is ModelState.Failed) {
-                Text("Download failed (code ${state.reason}). Try again.", color = MaterialTheme.colorScheme.error)
-            }
+            if (state is ModelState.Failed) Text(state.message, color = MaterialTheme.colorScheme.error)
             Button(onClick = onDownload) { Text("Download model (${OnDeviceModel.SIZE}, Wi-Fi)") }
         }
     }
